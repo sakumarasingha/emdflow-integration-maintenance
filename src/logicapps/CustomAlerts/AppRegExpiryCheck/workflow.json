@@ -1,0 +1,351 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Expired_Credentials": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "expired_credentials",
+                            "type": "array"
+                        }
+                    ]
+                },
+                "runAfter": {},
+                "type": "InitializeVariable"
+            },
+            "Expiring_Credentials": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "expiring_credentials",
+                            "type": "array"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Expired_Credentials": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Result": {
+                "actions": {
+                    "Error_Message": {
+                        "inputs": {
+                            "code": "var errors = workflowContext.actions.Filter_array.outputs;\r\nvar error = errors.body[0];\r\nvar statusCode = errors.code;\r\nvar errorMsg;\r\n\r\nif(error.hasOwnProperty('outputs')){\r\n    statusCode = error.outputs.statusCode;\r\n    if (error.outputs.hasOwnProperty('body'))\r\n    {\r\n        errorMsg = error.outputs.body.message;\r\n    }\r\n}\r\nelse if(error.hasOwnProperty('error')){\r\n    statusCode = error.error.code;\r\n    errorMsg = error.error.message;\r\n}\r\n\r\nvar result = {\r\n    \"statusCode\":statusCode,\r\n    \"message\": errorMsg\r\n};\r\n\r\nreturn result;"
+                        },
+                        "runAfter": {
+                            "Filter_array": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "trackedProperties": {
+                            "error_message": "@{outputs('Error_Message')?['message']}",
+                            "la_failed": true,
+                            "status_code": "@{outputs('Error_Message')?['statusCode']}"
+                        },
+                        "type": "JavaScriptCode"
+                    },
+                    "Filter_array": {
+                        "inputs": {
+                            "from": "@result('Scope')",
+                            "where": "@equals(item()?['status'],'Failed')"
+                        },
+                        "type": "Query"
+                    },
+                    "Terminate": {
+                        "inputs": {
+                            "runStatus": "Failed"
+                        },
+                        "runAfter": {
+                            "Error_Message": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Terminate"
+                    }
+                },
+                "runAfter": {
+                    "Scope": [
+                        "FAILED",
+                        "SKIPPED",
+                        "TIMEDOUT"
+                    ]
+                },
+                "type": "Scope"
+            },
+            "Scope": {
+                "actions": {
+                    "App_Registrations": {
+                        "inputs": "@body('Get_App_Registrations')?['value']",
+                        "runAfter": {
+                            "Get_App_Registrations": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "Email_Body": {
+                        "inputs": "@body('Transform_Email_Body')",
+                        "runAfter": {
+                            "Transform_Email_Body": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "Filter_Credentials": {
+                        "inputs": {
+                            "from": "@outputs('App_Registrations')",
+                            "where": "@greater(length(item()?['passwordCredentials']),0)"
+                        },
+                        "runAfter": {
+                            "App_Registrations": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Query"
+                    },
+                    "Flatten_Credentials": {
+                        "inputs": {
+                            "code": "const data = workflowContext.actions.Filter_Credentials.outputs.body;\r\n\r\nconst flattenedCredentials = data.flatMap(item => \r\n  item.passwordCredentials.map(cred => ({\r\n    endDateTime: cred.endDateTime,\r\n    endDateTimeLocal: convertToLocalTime(cred.endDateTime),\r\n    keyId: cred.keyId,\r\n    appId: item.appId,\r\n    appDisplayName: item.displayName\r\n  }))\r\n);\r\n\r\nreturn flattenedCredentials;\r\n\r\nfunction convertToLocalTime(endDateTime) {\r\n  const timeZone = 'Australia/Melbourne';\r\n  const utcDate = new Date(endDateTime);\r\n  let localTime =  utcDate.toLocaleString(\"en-AU\", {\r\n                    timeZone: timeZone\r\n                });\r\n  return localTime;\r\n}"
+                        },
+                        "runAfter": {
+                            "Filter_Credentials": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "JavaScriptCode"
+                    },
+                    "For_each": {
+                        "actions": {
+                            "If_Expired": {
+                                "actions": {
+                                    "Add_Expired_Credentials": {
+                                        "inputs": {
+                                            "name": "expired_credentials",
+                                            "value": "@item()"
+                                        },
+                                        "type": "AppendToArrayVariable"
+                                    }
+                                },
+                                "else": {
+                                    "actions": {
+                                        "Condition": {
+                                            "actions": {
+                                                "Add_Expiring_Credentials": {
+                                                    "inputs": {
+                                                        "name": "expiring_credentials",
+                                                        "value": "@item()"
+                                                    },
+                                                    "type": "AppendToArrayVariable"
+                                                }
+                                            },
+                                            "else": {
+                                                "actions": {}
+                                            },
+                                            "expression": {
+                                                "and": [
+                                                    {
+                                                        "less": [
+                                                            "@item()?['endDateTime']",
+                                                            "@addDays(utcNow(),30)"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "greaterOrEquals": [
+                                                            "@item()?['endDateTime']",
+                                                            "@utcNow()"
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "type": "If"
+                                        }
+                                    }
+                                },
+                                "expression": {
+                                    "and": [
+                                        {
+                                            "less": [
+                                                "@item()?['endDateTime']",
+                                                "@utcNow()"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "type": "If"
+                            }
+                        },
+                        "foreach": "@outputs('Sorted_Credentials')",
+                        "runAfter": {
+                            "Sorted_Credentials": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "concurrency": {
+                                "repetitions": 1
+                            }
+                        },
+                        "type": "Foreach"
+                    },
+                    "Get_App_Registrations": {
+                        "inputs": {
+                            "authentication": {
+                                "audience": "https://graph.microsoft.com",
+                                "authority": "",
+                                "clientId": "@{body('Get_Client_Id')?['value']}",
+                                "secret": "@{body('Get_Client_Secret')?['value']}",
+                                "tenant": "@{body('Get_secret-Tenant')?['value']}",
+                                "type": "ActiveDirectoryOAuth"
+                            },
+                            "method": "GET",
+                            "uri": "https://graph.microsoft.com/v1.0/applications?$select=id,appId,displayName,passwordCredentials"
+                        },
+                        "runAfter": {
+                            "Get_secret-Tenant": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        },
+                        "type": "Http"
+                    },
+                    "Get_Client_Id": {
+                        "inputs": {
+                            "parameters": {
+                                "secretName": "sp-aad-query-client-id"
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "keyVault",
+                                "operationId": "getSecret",
+                                "serviceProviderId": "/serviceProviders/keyVault"
+                            }
+                        },
+                        "type": "ServiceProvider"
+                    },
+                    "Get_Client_Secret": {
+                        "inputs": {
+                            "parameters": {
+                                "secretName": "sp-aad-query-client-secret"
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "keyVault",
+                                "operationId": "getSecret",
+                                "serviceProviderId": "/serviceProviders/keyVault"
+                            }
+                        },
+                        "runAfter": {
+                            "Get_Client_Id": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ServiceProvider"
+                    },
+                    "Get_secret-Tenant": {
+                        "inputs": {
+                            "parameters": {
+                                "secretName": "Tenant-Id"
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "keyVault",
+                                "operationId": "getSecret",
+                                "serviceProviderId": "/serviceProviders/keyVault"
+                            }
+                        },
+                        "runAfter": {
+                            "Get_Client_Secret": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ServiceProvider"
+                    },
+                    "Send_Email": {
+                        "inputs": {
+                            "body": {
+                                "email_body": "@outputs('Email_Body')",
+                                "email_subject": "Azure | Resource Expiry | Incident | High -PRD",
+                                "email_to": "@array(split(parameters('emailTo'),','))"
+                            },
+                            "host": {
+                                "workflow": {
+                                    "id": "EmailNotification"
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Email_Body": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Workflow"
+                    },
+                    "Sorted_Credentials": {
+                        "inputs": "@sort(outputs('Flatten_Credentials'),'endDateTime')",
+                        "runAfter": {
+                            "Flatten_Credentials": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "Transform_Email_Body": {
+                        "inputs": {
+                            "content": {
+                                "expiredCredentials": "@variables('expired_credentials')",
+                                "expiringCredentials": "@variables('expiring_credentials')"
+                            },
+                            "map": {
+                                "name": "sp-expiry-email-template.liquid",
+                                "source": "LogicApp"
+                            }
+                        },
+                        "kind": "JsonToText",
+                        "runAfter": {
+                            "For_each": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Liquid"
+                    }
+                },
+                "runAfter": {
+                    "Expiring_Credentials": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "Scope"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "Recurrence": {
+                "recurrence": {
+                    "frequency": "Day",
+                    "interval": 1,
+                    "schedule": {
+                        "hours": [
+                            "6"
+                        ]
+                    },
+                    "timeZone": "AUS Eastern Standard Time"
+                },
+                "type": "Recurrence"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

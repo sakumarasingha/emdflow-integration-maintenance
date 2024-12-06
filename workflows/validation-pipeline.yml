@@ -1,0 +1,24 @@
+trigger: none
+
+pool:
+  vmImage: 'windows-latest'
+
+jobs: 
+- job: ValidateIaC
+  displayName: Validate IaC
+  steps:
+
+    # Ensure the bicep code in the projects all pass the linter
+    - pwsh: |
+        az bicep build --file src/stripe/main.bicep
+      displayName: Run Foundation Bicep Linter 
+    
+    # Run security checks tailored for an IaC solution
+    - task: MicrosoftSecurityDevOps@1
+      displayName: Run Security Checks
+      inputs:
+        #tools: 'templateanalyzer,credscan,antimalware'
+        tools: 'credscan,antimalware'  # remove due to unable to exclude rules currently (00036)
+        break: true
+
+

@@ -1,0 +1,8 @@
+variables:
+  serviceConnectionName: 'NON PROD DEVOPS DEPLOYMENT'
+  integrationRgName: 'rg-integration-core-dev-ase-002'
+  integrationCoreRgName: 'rg-integration-core-dev-ase-001'
+  keyVaultName: 'kv-integ-dev-ase-001'
+  laNameCustomAlerts: 'logic-custom-alerts-dev-ase'
+  targetSubscriptionId: 'xxx'
+  environment: dev

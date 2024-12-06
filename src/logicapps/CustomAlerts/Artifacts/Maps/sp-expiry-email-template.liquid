@@ -1,0 +1,42 @@
+{% assign expired = content.expiredCredentials %}
+{% assign expiring = content.expiringCredentials %}
+
+<html>
+<h3>App Registration: Expiring Credentials (Next 30 Days)</h3>
+<table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+  <tr>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">App Name</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Secret Id</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Expiry Date (UTC)</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Expiry Date (Local)</th>
+  </tr>    
+    {% for app in expiring %} 
+      <tr>
+        <td>{{ app.appDisplayName }}</td>    
+        <td>{{ app.keyId }}</td>
+        <td>{{ app.endDateTime }}</td> 
+        <td>{{ app.endDateTimeLocal }}</td>     
+      </tr>    
+    {% if forloop.last == false %},{% endif %}
+    {% endfor %}
+</table>
+</br>
+<h3>App Registration: Expired Credentials</h3>
+<table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+  <tr>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">App Name</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Secret Id</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Expiry Date (UTC)</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Expiry Date (Local)</th>
+  </tr>    
+    {% for app in expired %}
+      <tr>
+        <td>{{ app.appDisplayName }}</td>    
+        <td>{{ app.keyId }}</td>
+        <td>{{ app.endDateTime }}</td>   
+        <td>{{ app.endDateTimeLocal }}</td>   
+      </tr>      
+    {% if forloop.last == false %},{% endif %}
+    {% endfor %}
+</table>
+</html>

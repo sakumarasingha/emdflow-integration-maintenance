@@ -1,0 +1,5 @@
+variables:
+   version.MajorMinor: '1.0'
+   version.Patch: $[counter(variables['version.MajorMinor'], 0)]
+   location: australiasoutheast
+   deploymentName: 'EmdFLow-Deployment-$(build.buildNumber)'

@@ -1,0 +1,132 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Result": {
+                "actions": {
+                    "Error_Message": {
+                        "inputs": {
+                            "code": "var errors = workflowContext.actions.Filter_array.outputs;\r\nvar error = errors.body[0];\r\nvar statusCode = errors.code;\r\nvar errorMsg;\r\n\r\nif(error.hasOwnProperty('outputs')){\r\n    statusCode = error.outputs.statusCode;\r\n    if (error.outputs.hasOwnProperty('body'))\r\n    {\r\n        errorMsg = error.outputs.body.message;\r\n    }\r\n}\r\nelse if(error.hasOwnProperty('error')){\r\n    statusCode = error.error.code;\r\n    errorMsg = error.error.message;\r\n}\r\n\r\nvar result = {\r\n    \"statusCode\":statusCode,\r\n    \"message\": errorMsg\r\n};\r\n\r\nreturn result;"
+                        },
+                        "runAfter": {
+                            "Filter_array": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "trackedProperties": {
+                            "error_message": "@{outputs('Error_Message')?['message']}",
+                            "la_failed": true,
+                            "status_code": "@{outputs('Error_Message')?['statusCode']}"
+                        },
+                        "type": "JavaScriptCode"
+                    },
+                    "Filter_array": {
+                        "inputs": {
+                            "from": "@result('Scope')",
+                            "where": "@equals(item()?['status'],'Failed')"
+                        },
+                        "type": "Query"
+                    },
+                    "Terminate": {
+                        "inputs": {
+                            "runStatus": "Failed"
+                        },
+                        "runAfter": {
+                            "Error_Message": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Terminate"
+                    }
+                },
+                "runAfter": {
+                    "Scope": [
+                        "FAILED",
+                        "SKIPPED",
+                        "TIMEDOUT"
+                    ]
+                },
+                "type": "Scope"
+            },
+            "Scope": {
+                "actions": {
+                    "Email_Body": {
+                        "inputs": "@triggerBody()",
+                        "type": "Compose"
+                    },
+                    "Response": {
+                        "inputs": {
+                            "statusCode": 200
+                        },
+                        "kind": "Http",
+                        "runAfter": {
+                            "Send_an_email_(V2)": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Response"
+                    },
+                    "Send_an_email_(V2)": {
+                        "inputs": {
+                            "body": {
+                                "Body": "<p class=\"editor-paragraph\">@{triggerBody()?['email_body']}</p>",
+                                "Importance": "Normal",
+                                "Subject": "@triggerBody()?['email_subject']",
+                                "To": "@join(triggerBody()?['email_to'],';')"
+                            },
+                            "host": {
+                                "connection": {
+                                    "referenceName": "office365"
+                                }
+                            },
+                            "method": "post",
+                            "path": "/v2/Mail"
+                        },
+                        "runAfter": {
+                            "Email_Body": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    }
+                },
+                "runAfter": {},
+                "type": "Scope"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "When_a_HTTP_request_is_received": {
+                "inputs": {
+                    "schema": {
+                        "properties": {
+                            "email_body": {
+                                "type": "string"
+                            },
+                            "email_cc": {
+                                "type": "array"
+                            },
+                            "email_subject": {
+                                "type": "string"
+                            },
+                            "email_to": {
+                                "type": "array"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

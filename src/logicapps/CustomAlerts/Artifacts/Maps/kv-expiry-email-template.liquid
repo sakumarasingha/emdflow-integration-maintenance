@@ -1,0 +1,20 @@
+{% assign event = content.event %}
+
+<html>
+<h3>{{event.eventType}} - {{event.eventTime}}</h3>
+<table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+  <tr>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">KeyVault Name</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Object Type</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Object Name</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Expiry Date Time(UTC)</th>
+    <th style="padding: 10px; background-color: #4CAF50; color: white; border: 1px solid #ddd; text-align: left;">Expiry Date Time(Local)</th>
+  </tr>  
+   <tr>
+      <td>{{ event.data.VaultName }}</td>  
+      <td>{{ event.data.ObjectType }}</td>    
+      <td>{{ event.data.ObjectName }}</td>
+      <td>{{ event.data.EXP }}</td>   
+      <td>{{ event.data.expLocal }}</td>   
+    </tr>   
+</table>

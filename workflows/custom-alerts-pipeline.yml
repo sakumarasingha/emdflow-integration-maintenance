@@ -1,0 +1,160 @@
+trigger: none 
+variables:
+  - template: './variables/common.yml'
+
+parameters:
+
+  - name: deploydev
+    type: boolean
+    displayName: 'Deploy to DEV'
+    default: true
+
+  - name: deploysit
+    type: boolean
+    displayName: 'Deploy to SIT'
+    default: false
+
+  - name: deployuat
+    type: boolean
+    displayName: 'Deploy to UAT'
+    default: false
+
+  - name: deployprd
+    type: boolean
+    displayName: 'Deploy to PROD'
+    default: false
+
+
+name: $(version.MajorMinor).$(version.Patch)
+
+stages:
+
+  - stage: build
+    displayName: "Create Artifacts"
+    jobs:
+      - job: Build
+        displayName: "Build Artifacts"
+        steps:
+          - task: CopyFiles@2
+            displayName: 'Copy Logic App - CustomAlerts'
+            inputs:
+              SourceFolder: '$(System.DefaultWorkingDirectory)/src/logicapps/CustomAlerts'
+              Contents: |
+                AppRegExpiryCheck/**
+                EmailNotification/**
+                KeyVaultExpiryCheck/**
+                Artifacts/**
+                host.json
+                parameters.json
+                connections.json       
+              TargetFolder: 'la_output'
+
+          - task: ArchiveFiles@2
+            displayName: 'Create project zip - CustomAlerts'
+            inputs:
+              rootFolderOrFile: '$(System.DefaultWorkingDirectory)/la_output'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/output/la.zip'
+              replaceExistingArchive: true
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/output'      
+              artifactName: 'drop'
+
+  # Deploy the Bicep to the dev environment 
+  - stage: devDeploy
+    condition: and(succeeded(), ${{ parameters.deployDev }})
+    displayName: 'Deploy to Dev'
+    dependsOn: build
+    variables:
+      - template: './variables/base/dev-base.variables.yml'
+    jobs:
+      - template: './templates/logicapp-stage.template.yml'
+        parameters:
+          environmentName: dev
+          serviceConnectionName: ${{ variables.serviceConnectionName }}
+          targetSubscriptionId: ${{ variables.targetSubscriptionId }}
+          deploymentJobName: 'deploy_dev'
+          deploymentName: ${{ variables.deploymentName }}
+          apiFriendlyName: 'Deploy Expiry Check'
+          resourceGroupName: ${{ variables.integrationRgName }}
+          integrationCoreRgName: ${{ variables.integrationCoreRgName }}
+          keyVaultName: ${{ variables.keyVaultName }}
+          templateFileName: './src/deploy/main.bicep'
+          parameterFileName: './src/deploy/env/main.dev.bicepparam'
+          laName: ${{ variables.laNameCustomAlerts }}
+
+
+  # Deploy the Bicep to the SIT environment 
+  - stage: deploysit
+    condition: and(succeeded(), ${{ parameters.deploysit }})
+    displayName: 'Deploy to SIT'
+    dependsOn: build
+    variables:
+      - template: './variables/base/sit-base.variables.yml'
+    jobs:
+      - template: './templates/logicapp-stage.template.yml'
+        parameters:
+          environmentName: sit
+          serviceConnectionName: ${{ variables.serviceConnectionName }}
+          targetSubscriptionId: ${{ variables.targetSubscriptionId }}
+          deploymentJobName: 'deploy_sit'
+          deploymentName: ${{ variables.deploymentName }}
+          apiFriendlyName: 'Deploy Expiry Check'
+          resourceGroupName: ${{ variables.integrationRgName }}
+          integrationCoreRgName: ${{ variables.integrationCoreRgName }}
+          keyVaultName: ${{ variables.keyVaultName }}
+          templateFileName: './src/deploy/main.bicep'
+          parameterFileName: './src/deploy/env/main.sit.bicepparam'
+          laName: ${{ variables.laNameCustomAlerts }}
+
+
+  # Deploy the Bicep to the UAT environment 
+  - stage: deployuat
+    condition: and(succeeded(), ${{ parameters.deployuat }})
+    displayName: 'Deploy to UAT'
+    dependsOn: build
+    variables:
+      - template: './variables/base/uat-base.variables.yml'
+    jobs:
+      - template: './templates/logicapp-stage.template.yml'
+        parameters:
+          environmentName: uat
+          serviceConnectionName: ${{ variables.serviceConnectionName }}
+          targetSubscriptionId: ${{ variables.targetSubscriptionId }}
+          deploymentJobName: 'deploy_uat'
+          deploymentName: ${{ variables.deploymentName }}
+          apiFriendlyName: 'Deploy Expiry Check'
+          resourceGroupName: ${{ variables.integrationRgName }}
+          integrationCoreRgName: ${{ variables.integrationCoreRgName }}
+          keyVaultName: ${{ variables.keyVaultName }}
+          templateFileName: './src/deploy/main.bicep'
+          parameterFileName: './src/deploy/env/main.uat.bicepparam'
+          laName: ${{ variables.laNameCustomAlerts }}
+
+
+
+  # Deploy the Bicep to the PRD environment 
+  - stage: deployprd
+    condition: and(succeeded(), ${{ parameters.deployprd }})
+    displayName: 'Deploy to PRD'
+    dependsOn: build
+    variables:
+      - template: './variables/base/prd-base.variables.yml'
+    jobs:
+      - template: './templates/logicapp-stage.template.yml'
+        parameters:
+          environmentName: prd
+          serviceConnectionName: ${{ variables.serviceConnectionName }}
+          targetSubscriptionId: ${{ variables.targetSubscriptionId }}
+          deploymentJobName: 'deploy_prd'
+          deploymentName: ${{ variables.deploymentName }}
+          apiFriendlyName: 'Deploy Expiry Check'
+          resourceGroupName: ${{ variables.integrationRgName }}
+          integrationCoreRgName: ${{ variables.integrationCoreRgName }}
+          keyVaultName: ${{ variables.keyVaultName }}
+          templateFileName: './src/deploy/main.bicep'
+          parameterFileName: './src/deploy/env/main.prd.bicepparam'
+          laName: ${{ variables.laNameCustomAlerts }}

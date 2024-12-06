@@ -1,0 +1,105 @@
+parameters:
+  - name: environmentName
+    default: ''
+  - name: serviceConnectionName
+    default: ''
+  - name: targetSubscriptionId
+    default: ''
+  - name: deploymentJobName
+    default: 'DeployJob'
+  - name: deploymentName
+    default: '$(Build.BuildNumber)'
+  - name: apiFriendlyName
+    default: ''
+  - name: resourceGroupName
+    default: ''
+  - name: integrationCoreRgName
+    default: ''
+  - name: keyVaultName
+    default: ''
+  - name: templateFileName
+    default: ''
+  - name: parameterFileName
+    default: ''
+  - name: laName
+    default: ''
+  
+jobs:
+  - deployment: ${{ parameters.deploymentJobName }}
+    displayName: 'Deploy ${{ parameters.apiFriendlyName }} to ${{ parameters.environmentName }}'
+    environment: "${{ parameters.environmentName }}"
+    timeoutInMinutes: 120
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+
+            # what-if           
+            - task: AzureCLI@2
+              displayName: Display Bicep Changes
+              inputs:
+                azureSubscription: ${{ parameters.serviceConnectionName }}
+                workingDirectory: '$(Build.SourcesDirectory)'
+                scriptType: pscore
+                scriptLocation: inlineScript
+                inlineScript: |
+                  az deployment group create --name ${{ parameters.deploymentName }} --mode Incremental --resource-group ${{ parameters.resourceGroupName }} --template-file ${{ parameters.templateFileName }} --parameters ${{ parameters.parameterFileName }} --what-if
+
+            # perform the bicep deployment
+            - task: AzureCLI@2
+              displayName: Deploy Bicep to Tenant
+              inputs:
+                azureSubscription: ${{ parameters.serviceConnectionName }}
+                workingDirectory: '$(Build.SourcesDirectory)'
+                scriptType: pscore
+                scriptLocation: inlineScript
+                inlineScript: |
+                  az deployment group create  --name ${{ parameters.deploymentName }} --mode Incremental --resource-group ${{ parameters.resourceGroupName }} --template-file ${{ parameters.templateFileName }} --parameters ${{ parameters.parameterFileName }}
+
+            # download the build artifacts
+            - task: DownloadPipelineArtifact@2                  
+              inputs:
+                buildType: 'current'
+                artifactName: 'drop'
+                targetPath: '$(System.DefaultWorkingDirectory)'
+
+
+            - script: |
+                echo "Waiting for 30 seconds..."
+                sleep 30
+              displayName: 'Delay'
+
+
+           # Enable Public Access 
+            - task: AzureCLI@2
+              displayName: Enable Public Access 
+              inputs:
+                azureSubscription: ${{ parameters.serviceConnectionName }}
+                scriptType: pscore
+                scriptLocation: inlineScript
+                inlineScript: |
+                  az resource update --resource-group ${{ parameters.resourceGroupName }}  --name ${{ parameters.laName }}  --resource-type "Microsoft.Web/sites" --set properties.publicNetworkAccess=Enabled
+                  az resource update --resource-group ${{ parameters.integrationCoreRgName }}  --name ${{ parameters.keyVaultName }}  --resource-type "Microsoft.KeyVault/vaults" --set properties.publicNetworkAccess=Enabled
+
+           # zip deployment - LA 
+            - task: AzureCLI@2
+              displayName: Deploy LA
+              inputs:
+                azureSubscription: ${{ parameters.serviceConnectionName }}
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  az logicapp deployment source config-zip --resource-group ${{ parameters.resourceGroupName }} -n ${{ parameters.laName }} --src "$(System.DefaultWorkingDirectory)/la.zip"
+
+            # Disable Public Access
+            - task: AzureCLI@2
+              displayName: Disable Public Access 
+              inputs:
+                azureSubscription: ${{ parameters.serviceConnectionName }}
+                scriptType: pscore
+                scriptLocation: inlineScript
+                inlineScript: |
+                  az resource update --resource-group ${{ parameters.resourceGroupName }}  --name ${{ parameters.laName }}  --resource-type "Microsoft.Web/sites" --set properties.publicNetworkAccess=Disabled
+                  az resource update --resource-group ${{ parameters.integrationCoreRgName }}  --name ${{ parameters.keyVaultName }}  --resource-type "Microsoft.KeyVault/vaults" --set properties.publicNetworkAccess=Disabled
+  

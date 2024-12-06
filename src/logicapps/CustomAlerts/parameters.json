@@ -1,0 +1,10 @@
+{
+    "emailEnvironment": {
+        "type": "String",
+        "value": "@appsetting('emailEnvironment')"
+    },
+    "emailTo": {
+        "type": "String",
+        "value": "@appsetting('emailRecipients')"
+    }
+}

@@ -1,0 +1,8 @@
+variables:
+  serviceConnectionName: 'PROD DEVOPS DEPLOYMENT'
+  integrationRgName: 'rg-integration-core-prd-ase-001'
+  integrationCoreRgName: 'rg-integration-core-prd-ase-001'
+  keyVaultName: 'kv-integ-prd-ase-001'
+  laNameCustomAlerts: 'logic-custom-alerts-prd-ase'
+  targetSubscriptionId: 'xxx'
+  environment: prd
